@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>tx-decoder // virus4d</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --red: #cc0000; --red-dim: #880000;
+      --bg: #000000; --bg2: #080808; --bg3: #111111;
+      --border: #1a1a1a; --text: #666666; --text-bright: #cccccc;
+      --green: #00cc44; --orange: #cc6600; --blue: #0052ff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:'Share Tech Mono',monospace; min-height:100vh; }
+    body::before { content:''; position:fixed; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.07) 2px,rgba(0,0,0,0.07) 4px); pointer-events:none; z-index:999; }
+    .container { max-width:860px; margin:0 auto; padding:36px 24px; }
+    header { margin-bottom:40px; border-bottom:1px solid var(--border); padding-bottom:20px; }
+    .logo { font-family:'Orbitron',monospace; font-size:24px; font-weight:900; color:var(--red); letter-spacing:3px; animation:flicker 6s infinite; }
+    .logo span { color:#222; }
+    .tagline { font-size:10px; color:#222; letter-spacing:3px; margin-top:5px; }
+    .badge { display:inline-block; font-size:9px; letter-spacing:2px; padding:3px 10px; border:1px solid #0052ff44; color:#0052ff; margin-top:8px; }
+    @keyframes flicker { 0%,94%,100%{opacity:1} 95%{opacity:.3} 96%{opacity:1} 98%{opacity:.5} 99%{opacity:1} }
+
+    .input-section { margin-bottom:28px; }
+    .prompt-line { display:flex; align-items:center; gap:10px; }
+    .prompt-label { color:var(--red); font-size:12px; white-space:nowrap; }
+    .input-wrapper { display:flex; flex:1; border:1px solid #1a1a1a; background:var(--bg2); }
+    .input-wrapper:focus-within { border-color:var(--red-dim); }
+    input[type="text"] { flex:1; background:transparent; border:none; outline:none; color:var(--text-bright); font-family:'Share Tech Mono',monospace; font-size:12px; padding:13px 14px; letter-spacing:1px; }
+    input::placeholder { color:#222; }
+    button#decode-btn { background:var(--red); border:none; color:#000; font-family:'Orbitron',monospace; font-size:10px; font-weight:700; letter-spacing:2px; padding:0 20px; cursor:pointer; transition:background 0.15s; white-space:nowrap; }
+    button#decode-btn:hover { background:#ff0000; }
+    button#decode-btn:disabled { background:#111; color:#333; cursor:not-allowed; }
+    .hint { font-size:10px; color:#222; letter-spacing:1px; margin-top:6px; }
+
+    #pipeline { display:none; margin-bottom:28px; }
+    .pipeline-steps { display:flex; border:1px solid var(--border); }
+    .step { flex:1; padding:10px 14px; font-size:9px; letter-spacing:2px; color:#222; border-right:1px solid var(--border); transition:all 0.3s; }
+    .step:last-child { border-right:none; }
+    .step.active { color:var(--red); background:rgba(204,0,0,0.05); }
+    .step.done { color:var(--green); }
+    .step.done::after { content:' ✓'; }
+
+    #status-bar { display:none; font-size:10px; color:var(--red); letter-spacing:2px; margin-bottom:16px; animation:blink 1s infinite; }
+    #error-box { display:none; background:rgba(204,0,0,0.05); border:1px solid var(--red-dim); color:var(--red); font-size:11px; padding:12px 16px; margin-bottom:20px; letter-spacing:1px; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .section-label { font-size:9px; color:#333; letter-spacing:3px; margin-bottom:10px; }
+
+    /* TX HEADER */
+    #tx-header { display:none; margin-bottom:28px; }
+    .tx-hero { background:var(--bg2); border-left:3px solid var(--red); padding:20px; }
+    .tx-type-big { font-family:'Orbitron',monospace; font-size:22px; font-weight:900; color:var(--red); margin-bottom:8px; letter-spacing:3px; }
+    .tx-hash-line { font-size:10px; color:#333; margin-bottom:12px; }
+    .tx-hash-line a { color:inherit; text-decoration:none; }
+    .tx-hash-line a:hover { color:var(--red); }
+    .tx-flow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    .tx-addr { background:var(--bg3); padding:8px 12px; font-size:10px; color:var(--text); border:1px solid var(--border); }
+    .tx-addr span { display:block; font-size:8px; color:#333; letter-spacing:2px; margin-bottom:3px; }
+    .tx-arrow { color:var(--red); font-size:16px; }
+    .tx-value { font-family:'Orbitron',monospace; font-size:18px; color:var(--text-bright); text-align:center; }
+    .tx-value-usd { font-size:10px; color:#444; text-align:center; margin-top:3px; }
+
+    /* STATS */
+    #stats-section { display:none; margin-bottom:28px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:2px; }
+    .stat-card { background:var(--bg2); padding:14px; border-left:2px solid var(--border); }
+    .stat-card label { font-size:8px; color:#333; letter-spacing:2px; display:block; margin-bottom:6px; }
+    .stat-card .val { font-family:'Orbitron',monospace; font-size:13px; color:var(--text-bright); }
+    .stat-card .val.small { font-size:10px; }
+    .stat-card .sub { font-size:9px; color:#444; margin-top:3px; }
+
+    /* STATUS BADGES */
+    .status-row { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+    .status-badge { font-size:9px; padding:4px 10px; border:1px solid; letter-spacing:1px; }
+    .status-badge.success { border-color:var(--green); color:var(--green); }
+    .status-badge.fail { border-color:var(--red); color:var(--red); }
+    .status-badge.verified { border-color:var(--green); color:var(--green); }
+    .status-badge.unverified { border-color:var(--orange); color:var(--orange); }
+    .status-badge.transfer { border-color:#627eea; color:#627eea; }
+    .status-badge.contract { border-color:var(--orange); color:var(--orange); }
+    .status-badge.swap { border-color:var(--blue); color:var(--blue); }
+
+    /* INPUT DATA */
+    #input-section { display:none; margin-bottom:28px; }
+    .input-data-box { background:var(--bg2); padding:16px; border-left:2px solid var(--border); }
+    .input-data-raw { font-size:9px; color:#333; word-break:break-all; line-height:1.6; max-height:80px; overflow:hidden; }
+    .input-data-raw.expanded { max-height:none; }
+    .expand-btn { font-size:9px; color:var(--red); cursor:pointer; margin-top:6px; letter-spacing:1px; background:none; border:none; font-family:'Share Tech Mono',monospace; }
+
+    /* AI */
+    #ai-section { display:none; margin-bottom:28px; }
+    .ai-box { background:var(--bg2); border:1px solid #1a1a1a; border-left:3px solid var(--red); padding:20px; }
+    .ai-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #111; padding-bottom:10px; }
+    .ai-label { font-size:10px; color:var(--red); letter-spacing:3px; }
+    .ai-model { font-size:9px; color:#222; letter-spacing:2px; }
+    #ai-output { font-size:11px; color:var(--text); line-height:1.8; white-space:pre-wrap; }
+    .thinking { color:#333; animation:blink 1s infinite; }
+
+    footer { margin-top:40px; padding-top:20px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-size:9px; color:#1a1a1a; letter-spacing:2px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">TX<span>-</span>DECODER</div>
+    <div class="tagline">// o que essa transação realmente fez? · by virus4d</div>
+    <div class="badge">BASE NETWORK · CHAIN ID 8453</div>
+  </header>
+
+  <div class="input-section">
+    <div class="prompt-line">
+      <span class="prompt-label">$&gt; decode</span>
+      <div class="input-wrapper">
+        <input type="text" id="tx-input" placeholder="0x hash da transação..." autocomplete="off" spellcheck="false"/>
+        <button id="decode-btn" onclick="runDecoder()">DECODIFICAR</button>
+      </div>
+    </div>
+    <div class="hint">// cole o hash de qualquer transação na rede Base</div>
+  </div>
+
+  <div id="status-bar"></div>
+  <div id="error-box"></div>
+
+  <div id="pipeline">
+    <div class="pipeline-steps">
+      <div class="step" id="step1">① TX DATA</div>
+      <div class="step" id="step2">② CONTRATO</div>
+      <div class="step" id="step3">③ GAS USD</div>
+      <div class="step" id="step4">④ EXPLICAR</div>
+    </div>
+  </div>
+
+  <!-- TX HEADER -->
+  <div id="tx-header">
+    <div class="section-label">// TRANSAÇÃO DECODIFICADA</div>
+    <div class="tx-hero">
+      <div class="tx-type-big" id="tx-type-label">—</div>
+      <div class="tx-hash-line">hash: <a id="tx-hash-link" href="#" target="_blank" id="tx-hash-display">—</a></div>
+      <div class="tx-flow">
+        <div class="tx-addr"><span>DE</span><span id="tx-from">—</span></div>
+        <div class="tx-arrow">→</div>
+        <div class="tx-addr"><span>PARA</span><span id="tx-to">—</span></div>
+        <div class="tx-arrow" style="color:#444">·</div>
+        <div>
+          <div class="tx-value" id="tx-value">—</div>
+          <div class="tx-value-usd" id="tx-value-usd"></div>
+        </div>
+      </div>
+      <div class="status-row" id="status-row"></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div id="stats-section">
+    <div class="section-label">// DETALHES TÉCNICOS</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <label>GAS USADO</label>
+        <div class="val small" id="s-gas">—</div>
+        <div class="sub" id="s-gas-usd"></div>
+      </div>
+      <div class="stat-card">
+        <label>GAS PRICE</label>
+        <div class="val small" id="s-gasprice">—</div>
+      </div>
+      <div class="stat-card">
+        <label>BLOCO</label>
+        <div class="val small" id="s-block">—</div>
+      </div>
+      <div class="stat-card">
+        <label>NONCE</label>
+        <div class="val" id="s-nonce">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT DATA -->
+  <div id="input-section">
+    <div class="section-label">// INPUT DATA</div>
+    <div class="input-data-box">
+      <div class="input-data-raw" id="input-data-raw">—</div>
+      <button class="expand-btn" onclick="toggleInput()">// mostrar tudo</button>
+    </div>
+  </div>
+
+  <!-- AI -->
+  <div id="ai-section">
+    <div class="ai-box">
+      <div class="ai-header">
+        <span class="ai-label">⬡ EXPLICAÇÃO DO AGENTE</span>
+        <span class="ai-model">llama-3.3-70b · groq</span>
+      </div>
+      <div id="ai-output"><span class="thinking">▓ processando...</span></div>
+    </div>
+  </div>
+
+  <footer>
+    <span>tx-decoder // virus4d</span>
+    <span>base network · etherscan v2 · groq llm</span>
+  </footer>
+
+</div>
+
+<script>
+  const BASESCAN_KEY = 'XH56ZMYSJTI64KY3V14NMWH7ZV6DFU951Z';
+  const GROQ_KEY     = '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';
+  const CHAIN_ID     = 8453;
+  const RPC          = 'https://mainnet.base.org';
+
+  const short = a => a ? a.slice(0,6)+'...'+a.slice(-4) : '—';
+  let inputExpanded = false;
+
+  function toGwei(wei) { return (parseInt(wei) / 1e9).toFixed(2) + ' Gwei'; }
+  function toEth(wei)  { return (parseInt(wei) / 1e18).toFixed(6); }
+
+  function setStep(n, s) { document.getElementById('step'+n).className='step '+s; }
+  function setStatus(msg, show) { const el=document.getElementById('status-bar'); el.textContent=msg; el.style.display=show?'block':'none'; }
+  function showError(msg) { const el=document.getElementById('error-box'); el.textContent='// ERRO: '+msg; el.style.display='block'; }
+  function hideError() { document.getElementById('error-box').style.display='none'; }
+
+  function toggleInput() {
+    const el = document.getElementById('input-data-raw');
+    const btn = document.querySelector('.expand-btn');
+    inputExpanded = !inputExpanded;
+    el.className = 'input-data-raw' + (inputExpanded ? ' expanded' : '');
+    btn.textContent = inputExpanded ? '// mostrar menos' : '// mostrar tudo';
+  }
+
+  function detectTxType(tx) {
+    if (!tx.input || tx.input === '0x') {
+      return { type: 'TRANSFER', label: 'TRANSFER', badgeClass: 'transfer' };
+    }
+    const sig = tx.input.slice(0, 10).toLowerCase();
+    // common function signatures
+    const sigs = {
+      '0xa9059cbb': { type: 'TOKEN TRANSFER', label: 'TOKEN TRANSFER', badgeClass: 'transfer' },
+      '0x23b872dd': { type: 'TOKEN TRANSFER', label: 'TOKEN TRANSFER', badgeClass: 'transfer' },
+      '0x095ea7b3': { type: 'APPROVAL', label: 'APPROVAL', badgeClass: 'contract' },
+      '0x7ff36ab5': { type: 'SWAP', label: 'SWAP', badgeClass: 'swap' },
+      '0x38ed1739': { type: 'SWAP', label: 'SWAP', badgeClass: 'swap' },
+      '0x18cbafe5': { type: 'SWAP', label: 'SWAP', badgeClass: 'swap' },
+      '0x5c11d795': { type: 'SWAP', label: 'SWAP', badgeClass: 'swap' },
+      '0xd0e30db0': { type: 'DEPOSIT', label: 'DEPOSIT', badgeClass: 'contract' },
+      '0x2e1a7d4d': { type: 'WITHDRAW', label: 'WITHDRAW', badgeClass: 'contract' },
+      '0x1249c58b': { type: 'MINT', label: 'MINT', badgeClass: 'contract' },
+      '0xa0712d68': { type: 'MINT', label: 'MINT', badgeClass: 'contract' },
+    };
+    return sigs[sig] || { type: 'CONTRACT CALL', label: 'CONTRACT CALL', badgeClass: 'contract' };
+  }
+
+  async function runDecoder() {
+    const input = document.getElementById('tx-input').value.trim();
+    const btn = document.getElementById('decode-btn');
+
+    if (!input || input.length !== 66 || !input.startsWith('0x')) {
+      showError('hash inválido — deve começar com 0x e ter 66 caracteres');
+      return;
+    }
+
+    hideError();
+    btn.disabled = true;
+
+    ['tx-header','stats-section','input-section','ai-section'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+
+    document.getElementById('pipeline').style.display = 'block';
+    setStep(1,'active'); setStep(2,''); setStep(3,''); setStep(4,'');
+    setStatus('▓ BUSCANDO TRANSAÇÃO NA BASE...', true);
+
+    try {
+      // STEP 1: tx via RPC
+      const [txRes, receiptRes] = await Promise.all([
+        fetch(RPC, { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getTransactionByHash',params:[input]}) }),
+        fetch(RPC, { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({jsonrpc:'2.0',id:2,method:'eth_getTransactionReceipt',params:[input]}) })
+      ]);
+
+      const txData     = await txRes.json();
+      const receiptData = await receiptRes.json();
+
+      const tx      = txData.result;
+      const receipt = receiptData.result;
+
+      if (!tx) throw new Error('transação não encontrada na rede Base');
+
+      const txType = detectTxType(tx);
+      const success = receipt?.status === '0x1';
+      const ethValue = parseFloat(toEth(tx.value || '0x0'));
+      const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 0;
+      const gasPrice = parseInt(tx.gasPrice || '0x0', 16);
+      const gasCostWei = gasUsed * gasPrice;
+      const gasCostEth = gasCostWei / 1e18;
+
+      // tx header
+      document.getElementById('tx-type-label').textContent = txType.label;
+      document.getElementById('tx-hash-display').textContent = short(input);
+      document.getElementById('tx-hash-link').href = `https://basescan.org/tx/${input}`;
+      document.getElementById('tx-from').textContent = short(tx.from);
+      document.getElementById('tx-to').textContent = short(tx.to);
+      document.getElementById('tx-value').textContent = ethValue.toFixed(6) + ' ETH';
+
+      // status badges
+      const statusRow = document.getElementById('status-row');
+      statusRow.innerHTML = `
+        <span class="status-badge ${success ? 'success' : 'fail'}">${success ? '✓ SUCESSO' : '✗ FALHOU'}</span>
+        <span class="status-badge ${txType.badgeClass}">${txType.label}</span>
+      `;
+
+      document.getElementById('tx-header').style.display = 'block';
+
+      setStep(1,'done'); setStep(2,'active');
+      setStatus('▓ VERIFICANDO CONTRATO...', true);
+
+      // STEP 2: verificar contrato
+      let verified = false;
+      let contractName = '';
+      if (tx.to && tx.input !== '0x') {
+        try {
+          const verUrl = `https://api.etherscan.io/v2/api?chainid=${CHAIN_ID}&module=contract&action=getsourcecode&address=${tx.to}&apikey=${BASESCAN_KEY}`;
+          const proxies = [
+            'https://corsproxy.io/?'+encodeURIComponent(verUrl),
+            'https://api.allorigins.win/raw?url='+encodeURIComponent(verUrl),
+          ];
+          for (const p of proxies) {
+            try {
+              const r = await fetch(p);
+              const j = await r.json();
+              if (j.result?.[0]?.SourceCode) {
+                verified = j.result[0].SourceCode !== '';
+                contractName = j.result[0].ContractName || '';
+                break;
+              }
+            } catch(e) {}
+          }
+        } catch(e) {}
+
+        statusRow.innerHTML += `<span class="status-badge ${verified ? 'verified' : 'unverified'}">${verified ? '✓ CONTRATO VERIFICADO' : '⚠ CONTRATO NÃO VERIFICADO'}</span>`;
+        if (contractName) statusRow.innerHTML += `<span class="status-badge contract">${contractName}</span>`;
+      }
+
+      setStep(2,'done'); setStep(3,'active');
+      setStatus('▓ CALCULANDO GAS EM USD...', true);
+
+      // STEP 3: ETH price + gas USD
+      let ethPrice = 0;
+      try {
+        const pr = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+        const pd = await pr.json();
+        ethPrice = pd?.ethereum?.usd || 0;
+      } catch(e) {}
+
+      const gasCostUsd = gasCostEth * ethPrice;
+      const valueCostUsd = ethValue * ethPrice;
+
+      document.getElementById('tx-value-usd').textContent = ethPrice > 0 && ethValue > 0 ? `≈ $${valueCostUsd.toFixed(2)} USD` : '';
+      document.getElementById('s-gas').textContent = gasUsed.toLocaleString() + ' gas';
+      document.getElementById('s-gas-usd').textContent = ethPrice > 0 ? `≈ $${gasCostUsd.toFixed(4)} USD` : '';
+      document.getElementById('s-gasprice').textContent = toGwei(tx.gasPrice || '0x0');
+      document.getElementById('s-block').textContent = parseInt(tx.blockNumber, 16).toLocaleString();
+      document.getElementById('s-nonce').textContent = parseInt(tx.nonce, 16);
+      document.getElementById('stats-section').style.display = 'block';
+
+      // input data
+      if (tx.input && tx.input !== '0x') {
+        document.getElementById('input-data-raw').textContent = tx.input;
+        document.getElementById('input-section').style.display = 'block';
+      }
+
+      setStep(3,'done'); setStep(4,'active');
+      setStatus('▓ EXPLICANDO COM IA...', true);
+
+      // STEP 4: GROQ
+      document.getElementById('ai-section').style.display = 'block';
+      document.getElementById('ai-output').innerHTML = '<span class="thinking">▓ decodificando em linguagem humana...</span>';
+
+      const prompt = `Você é um especialista em blockchain que explica transações on-chain de forma simples e direta.
+
+Explique esta transação da rede Base em PORTUGUÊS (Brasil). Seja claro, técnico mas acessível.
+
+HASH: ${input}
+TIPO: ${txType.type}
+STATUS: ${success ? 'SUCESSO' : 'FALHOU'}
+DE: ${tx.from}
+PARA: ${tx.to}
+VALOR: ${ethValue.toFixed(6)} ETH${ethPrice > 0 ? ` (≈ $${valueCostUsd.toFixed(2)} USD)` : ''}
+GAS USADO: ${gasUsed.toLocaleString()}${ethPrice > 0 ? ` (≈ $${gasCostUsd.toFixed(4)} USD)` : ''}
+GAS PRICE: ${toGwei(tx.gasPrice || '0x0')}
+BLOCO: ${parseInt(tx.blockNumber, 16)}
+CONTRATO: ${verified ? `verificado (${contractName || 'sem nome'})` : tx.input !== '0x' ? 'não verificado' : 'N/A — transferência simples'}
+INPUT DATA: ${tx.input !== '0x' ? tx.input.slice(0,10) + '...' : 'nenhum (transferência ETH simples)'}
+
+Responda SOMENTE em português com:
+1. O QUE ACONTECEU — explique em 1-2 frases o que essa transação fez, como se fosse para alguém que não entende de blockchain
+2. QUEM PAGOU O QUÊ — valor transferido e custo do gas em USD
+3. PONTO DE ATENÇÃO — algo relevante sobre essa tx (contrato não verificado, valor alto, falha, etc.)
+
+Máximo 120 palavras. Direto ao ponto.`;
+
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method:'POST',
+        headers:{ 'Authorization':`Bearer ${GROQ_KEY}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.5 })
+      });
+
+      const groqData = await groqRes.json();
+      if (groqData.error) throw new Error('Groq: ' + (groqData.error.message || 'erro'));
+      if (!groqData.choices?.[0]?.message?.content) throw new Error('agente IA não respondeu');
+
+      document.getElementById('ai-output').textContent = groqData.choices[0].message.content;
+
+      setStep(4,'done');
+      setStatus('', false);
+
+    } catch(err) {
+      setStatus('', false);
+      showError(err.message || 'erro desconhecido');
+      setStep(1,''); setStep(2,''); setStep(3,''); setStep(4,'');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('tx-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runDecoder();
+  });
+</script>
+</body>
+</html>
