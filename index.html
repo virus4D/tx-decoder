@@ -139,7 +139,7 @@
     <div class="section-label">// TRANSAÇÃO DECODIFICADA</div>
     <div class="tx-hero">
       <div class="tx-type-big" id="tx-type-label">—</div>
-      <div class="tx-hash-line">hash: <a id="tx-hash-link" href="#" target="_blank" id="tx-hash-display">—</a></div>
+      <div class="tx-hash-line">hash: <a id="tx-hash-link" href="#" target="_blank">—</a></div>
       <div class="tx-flow">
         <div class="tx-addr"><span>DE</span><span id="tx-from">—</span></div>
         <div class="tx-arrow">→</div>
@@ -299,7 +299,6 @@
 
       // tx header
       document.getElementById('tx-type-label').textContent = txType.label;
-      document.getElementById('tx-hash-display').textContent = short(input);
       document.getElementById('tx-hash-link').href = `https://basescan.org/tx/${input}`;
       document.getElementById('tx-from').textContent = short(tx.from);
       document.getElementById('tx-to').textContent = short(tx.to);
